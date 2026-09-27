@@ -9,12 +9,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
   Modal,
   StatusBar,
   TouchableWithoutFeedback,
   Dimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -156,88 +156,146 @@ export default function LoginScreen() {
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" translucent={true} backgroundColor="transparent" />
 
-      {/* Hero Section: Full bleed architectural photography */}
+      {/* Hero Section: Full bleed high-res palace photography */}
       <View style={styles.heroSection}>
         <Image
-          source={require('../../../assets/images/auth-bg.jpg')}
+          source={{
+            uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Lakshmi_Vilas_Palace%2C_Vadodara.jpg/1200px-Lakshmi_Vilas_Palace%2C_Vadodara.jpg',
+          }}
+          defaultSource={require('../../../assets/images/auth-bg.jpg')}
           style={styles.heroImage}
-          resizeMode="cover"
+          contentFit="cover"
+          transition={300}
         />
 
-        {/* Multi-stop cinematic gradient to smoothly transition from photo to warm light canvas */}
+        {/* Top Vignette Gradient for clean header contrast */}
         <LinearGradient
-          colors={[
-            'rgba(18, 14, 11, 0.65)',
-            'rgba(18, 14, 11, 0.15)',
-            'rgba(250, 248, 245, 0.45)',
-            'rgba(250, 248, 245, 0.92)',
-            '#FAF8F5',
-          ]}
-          locations={[0, 0.35, 0.72, 0.9, 1]}
-          style={styles.heroGradient}
+          colors={['rgba(15, 23, 42, 0.65)', 'rgba(15, 23, 42, 0.15)', 'transparent']}
+          locations={[0, 0.35, 0.7]}
+          style={styles.topVignette}
+          pointerEvents="none"
         />
 
         {/* Floating Top Header Bar */}
         <View style={[styles.topFloatingBar, { top: insets.top + 8 }]}>
+          {/* Brand Logo: "Yatra." with coral dot */}
           <TouchableOpacity
-            style={styles.brandPill}
-            activeOpacity={0.8}
+            style={styles.brandRow}
+            activeOpacity={0.85}
             onLongPress={__DEV__ ? handleDevSkip : undefined}
             delayLongPress={700}
           >
-            <View style={styles.brandDot} />
-            <Text style={styles.brandTitleText}>YATRA</Text>
-            <View style={styles.versionBadge}>
-              <Text style={styles.versionBadgeText}>v2.0</Text>
-            </View>
+            <Text style={styles.brandText}>
+              Yatra<Text style={styles.brandCoralDot}>•</Text>
+            </Text>
           </TouchableOpacity>
 
+          {/* Frosted Skip Pill Button */}
           <TouchableOpacity
-            style={styles.langPill}
-            onPress={() => setIsLangModalOpen(true)}
+            style={styles.skipButton}
+            onPress={handleGuestLogin}
             activeOpacity={0.8}
+            hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
           >
-            <Text style={styles.langPillText}>{currentLangObj.flag} {currentLangObj.code.toUpperCase()}</Text>
-            <Ionicons name="chevron-down" size={12} color="#FFFFFF" style={{ marginLeft: 3 }} />
+            {isGuestLoading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.skipButtonText}>Skip</Text>
+            )}
           </TouchableOpacity>
         </View>
 
-        {/* Monument Location Chip */}
-        <View style={styles.locationChipContainer}>
-          <View style={styles.locationChip}>
-            <Ionicons name="location-sharp" size={13} color="#F59E0B" />
-            <Text style={styles.locationChipText}>Rani Ki Vav • Patan (UNESCO Site)</Text>
+        {/* Floating Location Badge (Top-Left under header) */}
+        <View style={[styles.locationBadge, { top: insets.top + 60 }]}>
+          <Ionicons name="location-sharp" size={13} color="#EF4444" />
+          <Text style={styles.locationBadgeText}>Vadodara, Gujarat</Text>
+        </View>
+
+        {/* Floating Social Proof & Rating Badge (Bottom-Right, overlapping bottom card) */}
+        <View style={styles.reviewBadge}>
+          <View style={styles.avatarStack}>
+            <View style={[styles.avatarCircle, { backgroundColor: '#FBBF24' }]}>
+              <Text style={styles.avatarText}>A</Text>
+            </View>
+            <View style={[styles.avatarCircle, { backgroundColor: '#60A5FA', marginLeft: -8 }]}>
+              <Text style={styles.avatarText}>S</Text>
+            </View>
+            <View style={[styles.avatarCircle, { backgroundColor: '#34D399', marginLeft: -8 }]}>
+              <Text style={styles.avatarText}>RV</Text>
+            </View>
+          </View>
+          <View style={styles.ratingInfo}>
+            <View style={styles.ratingStarRow}>
+              <Ionicons name="star" size={12} color="#F59E0B" />
+              <Text style={styles.ratingScore}>4.9</Text>
+            </View>
+            <Text style={styles.ratingCount}>(1.4k+ explorers)</Text>
           </View>
         </View>
       </View>
 
-      {/* Content & Action Section */}
-      <View style={[styles.contentSection, { paddingBottom: Math.max(insets.bottom + 16, 24) }]}>
-        <View style={styles.kickerRow}>
-          <View style={styles.kickerIndicator} />
-          <Text style={styles.kickerText}>HERITAGE COMPANION</Text>
+      {/* Bottom Sheet Card: Pure white, clean rounded top */}
+      <View style={[styles.bottomSheet, { paddingBottom: Math.max(insets.bottom + 12, 24) }]}>
+        {/* Carousel Pagination Dots [ === • • ] */}
+        <View style={styles.paginationRow}>
+          <View style={styles.paginationActive} />
+          <View style={styles.paginationInactive} />
+          <View style={styles.paginationInactive} />
         </View>
 
-        <Text style={styles.mainTitle}>Explore Gujarat’s Heritage</Text>
-        <Text style={styles.mainDescription}>
-          Turn-by-turn routes, real-time monument footfall, and spoken audio stories for 155+ historical sites.
+        {/* Main Headline with Editorial Italic Serif */}
+        <Text style={styles.headline}>
+          Explore <Text style={styles.heritageItalic}>Heritage</Text> Like Never Before.
         </Text>
 
-        <View style={styles.actionContainer}>
-          <ScalePressable
-            style={styles.getStartedButton}
-            onPress={() => setShowLoginSheet(true)}
-          >
-            <Text style={styles.getStartedButtonText}>Get Started</Text>
-            <View style={styles.getStartedArrowWrap}>
-              <Ionicons name="arrow-forward" size={16} color="#1C1917" />
-            </View>
-          </ScalePressable>
+        {/* Clean 2-Line Subtitle */}
+        <Text style={styles.subtitle}>
+          Discover 155+ historical wonders, listen to real-time audio stories, and navigate routes with zero hassle.
+        </Text>
 
-          <Text style={styles.captionHint}>
-            No account required to preview maps • Free for all travelers
-          </Text>
+        {/* 3 Micro-Feature Pills */}
+        <View style={styles.featureChipsRow}>
+          <View style={styles.featureChip}>
+            <Ionicons name="headset-outline" size={13} color="#475569" />
+            <Text style={styles.featureChipText}>Audio Stories</Text>
+          </View>
+          <View style={styles.featureChip}>
+            <Ionicons name="business-outline" size={13} color="#475569" />
+            <Text style={styles.featureChipText}>155+ Monuments</Text>
+          </View>
+          <View style={styles.featureChip}>
+            <Ionicons name="location-outline" size={13} color="#EF4444" />
+            <Text style={styles.featureChipText}>Live Routes</Text>
+          </View>
         </View>
+
+        {/* Primary Dribbble-Style "Get Started" CTA Button */}
+        <ScalePressable
+          style={styles.getStartedButton}
+          onPress={handleGuestLogin}
+        >
+          {isGuestLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" style={{ flex: 1 }} />
+          ) : (
+            <>
+              <Text style={styles.getStartedButtonText}>Get Started</Text>
+              <View style={styles.getStartedArrowWrap}>
+                <Ionicons name="arrow-forward" size={16} color="#0F172A" />
+              </View>
+            </>
+          )}
+        </ScalePressable>
+
+        {/* Bottom Login Link */}
+        <TouchableOpacity
+          style={styles.loginLinkWrap}
+          onPress={() => setShowLoginSheet(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.loginHintText}>
+            Already have an account? <Text style={styles.loginLinkText}>Log in</Text>
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Auth Bottom Sheet (Opens cleanly when Get Started is tapped) */}
@@ -481,21 +539,26 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#FAF8F5',
+    backgroundColor: '#0F172A',
   },
   heroSection: {
-    height: SCREEN_HEIGHT * 0.64,
+    height: SCREEN_HEIGHT * 0.58,
     width: '100%',
     position: 'relative',
-    backgroundColor: '#1C1917',
+    backgroundColor: '#1E293B',
     overflow: 'hidden',
   },
   heroImage: {
     width: '100%',
     height: '100%',
   },
-  heroGradient: {
-    ...StyleSheet.absoluteFill,
+  topVignette: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 140,
+    zIndex: 10,
   },
   topFloatingBar: {
     position: 'absolute',
@@ -504,160 +567,231 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 20,
+    zIndex: 25,
   },
-  brandPill: {
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  brandText: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.6,
+  },
+  brandCoralDot: {
+    color: '#E07A5F',
+    fontSize: 28,
+    fontWeight: '900',
+  },
+  skipButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.38)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  skipButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  locationBadge: {
+    position: 'absolute',
+    left: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    backgroundColor: 'rgba(28, 25, 23, 0.45)',
+    gap: 5,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 6.5,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.18)',
-  },
-  brandDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#E05328',
-  },
-  brandTitleText: {
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
-    color: '#FFFFFF',
-  },
-  versionBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  versionBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  langPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(28, 25, 23, 0.45)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-  },
-  langPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  locationChipContainer: {
-    position: 'absolute',
-    bottom: 24,
-    left: 24,
     zIndex: 15,
   },
-  locationChip: {
+  locationBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  reviewBadge: {
+    position: 'absolute',
+    right: 20,
+    bottom: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 25,
+  },
+  avatarStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  avatarText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  ratingInfo: {
+    flexDirection: 'column',
+  },
+  ratingStarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  ratingScore: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  ratingCount: {
+    fontSize: 9.5,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  bottomSheet: {
+    flex: 1,
+    marginTop: -32,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    justifyContent: 'space-between',
+    zIndex: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  paginationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(231, 226, 214, 0.8)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
+    marginBottom: 10,
   },
-  locationChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#1C1917',
+  paginationActive: {
+    width: 26,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#E07A5F',
   },
-  contentSection: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'space-between',
-    backgroundColor: '#FAF8F5',
+  paginationInactive: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#E2E8F0',
   },
-  kickerRow: {
+  headline: {
+    fontSize: 27,
+    fontWeight: '800',
+    color: '#0F172A',
+    lineHeight: 34,
+    letterSpacing: -0.4,
+    marginBottom: 6,
+  },
+  heritageItalic: {
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    fontStyle: 'italic',
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    lineHeight: 18.5,
+    marginBottom: 12,
+  },
+  featureChipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    marginTop: 6,
-    marginBottom: 4,
+    gap: 6,
+    marginBottom: 14,
+    flexWrap: 'wrap',
   },
-  kickerIndicator: {
-    width: 14,
-    height: 2.5,
-    borderRadius: 1.5,
-    backgroundColor: '#E05328',
+  featureChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4.5,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  kickerText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#E05328',
-    letterSpacing: 1.5,
-  },
-  mainTitle: {
-    fontSize: 27,
-    fontWeight: '900',
-    color: '#1C1917',
-    lineHeight: 33,
-    letterSpacing: -0.4,
-  },
-  mainDescription: {
-    fontSize: 13,
-    color: '#78716C',
-    lineHeight: 19,
-    marginTop: 6,
-  },
-  actionContainer: {
-    marginTop: 'auto',
-    paddingTop: 16,
-    gap: 10,
+  featureChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
   },
   getStartedButton: {
-    backgroundColor: '#1C1917',
+    backgroundColor: '#0F172A',
     height: 54,
     borderRadius: 27,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 22,
-    shadowColor: '#1C1917',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 6,
+    paddingLeft: 22,
+    paddingRight: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
   },
   getStartedButtonText: {
     fontSize: 15,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   getStartedArrowWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  captionHint: {
-    fontSize: 11,
-    color: '#A8A29E',
-    textAlign: 'center',
+  loginLinkWrap: {
+    alignItems: 'center',
+    paddingTop: 6,
+    paddingBottom: 2,
+  },
+  loginHintText: {
+    fontSize: 12.5,
+    color: '#64748B',
     fontWeight: '500',
+  },
+  loginLinkText: {
+    color: '#0F172A',
+    fontWeight: '800',
+    textDecorationLine: 'underline',
   },
   sheetBackdrop: {
     flex: 1,
