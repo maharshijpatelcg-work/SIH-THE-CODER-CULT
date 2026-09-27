@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, getAppTheme } from '../constants/theme';
+import { useUserStore } from '../stores';
 import { getLiveWeather, getLiveCrowd, WeatherInfo, CrowdInfo } from '../utils/touristMeta';
 import { WeatherCrowdBarSkeleton } from './Skeleton';
 
@@ -95,37 +96,51 @@ export function WeatherCrowdBar({
 
   const crowd: CrowdInfo = getLiveCrowd(placeName);
   const isMonumentView = Boolean(placeName);
+  const themeMode = useUserStore((s) => s.themeMode);
+  const themeColors = getAppTheme(themeMode);
 
   return (
     <TouchableOpacity
-      style={[styles.container, variant === 'full' && styles.containerFull]}
+      style={[
+        styles.container,
+        variant === 'full' && styles.containerFull,
+        {
+          backgroundColor: themeColors.surfaceElevated,
+          borderColor: themeColors.border,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: themeColors.isDark ? 0.2 : 0.05,
+          shadowRadius: 8,
+          elevation: 2,
+        },
+      ]}
       onPress={() => setExpanded(!expanded)}
       activeOpacity={0.88}
     >
       <View style={styles.row}>
         <View style={styles.metricItem}>
-          <View style={styles.iconCircle}>
-            <MaterialIcons name={weather.icon as any} size={16} color={Colors.primary} />
+          <View style={[styles.iconCircle, { backgroundColor: themeColors.isDark ? 'rgba(212, 175, 124, 0.15)' : 'rgba(224, 122, 95, 0.12)' }]}>
+            <MaterialIcons name={weather.icon as any} size={16} color={themeColors.primary} />
           </View>
           <View style={styles.metricTextWrap}>
-            <Text style={styles.metricValue} numberOfLines={1}>{weather.temp}°C</Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>{weather.condition}</Text>
+            <Text style={[styles.metricValue, { color: themeColors.text }]} numberOfLines={1}>{weather.temp}°C</Text>
+            <Text style={[styles.metricLabel, { color: themeColors.textMuted }]} numberOfLines={1}>{weather.condition}</Text>
           </View>
         </View>
 
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
 
         {/* Crowd Level Chip */}
         <View style={styles.metricItem}>
           <View style={[styles.crowdDot, { backgroundColor: crowd.color }]} />
           <View style={styles.metricTextWrap}>
             <View style={styles.crowdHeader}>
-              <Text style={styles.metricValue} numberOfLines={1}>
-                {isMonumentView ? `${crowd.level} Crowd` : 'Tourism Radar'}
+              <Text style={[styles.metricValue, { color: themeColors.isDark ? themeColors.text : themeColors.secondary }]} numberOfLines={1}>
+                {isMonumentView ? `${crowd.level} Crowd` : '24% Crowd Density'}
               </Text>
             </View>
-            <Text style={styles.metricLabel} numberOfLines={1}>
-              {isMonumentView ? `~${crowd.waitTimeMins}m wait time` : `${crowd.level} Flow · Open`}
+            <Text style={[styles.metricLabel, { color: themeColors.textMuted }]} numberOfLines={1}>
+              {isMonumentView ? `~${crowd.waitTimeMins}m wait time` : 'Optimal visiting window'}
             </Text>
           </View>
         </View>
@@ -133,7 +148,7 @@ export function WeatherCrowdBar({
         <MaterialIcons
           name={expanded ? 'expand-less' : 'info-outline'}
           size={18}
-          color={Colors.textMuted}
+          color={themeColors.textMuted}
           style={styles.infoIcon}
         />
       </View>

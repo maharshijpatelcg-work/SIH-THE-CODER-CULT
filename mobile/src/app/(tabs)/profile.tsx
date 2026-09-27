@@ -10,18 +10,32 @@ import {
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography, Spacing, BorderRadius, LANGUAGES, INTERESTS_OPTIONS, TRAVEL_STYLES } from '../../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, LANGUAGES, INTERESTS_OPTIONS, TRAVEL_STYLES, getAppTheme } from '../../constants/theme';
 import { useUserStore, usePlacesStore, useOfflineStore } from '../../stores';
 import { useTranslation } from '../../hooks/useTranslation';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { name, email, isGuest, language, interests, travelStyle, duration, setLanguage, setPreferences, setOnboarded, logout } = useUserStore();
+  const {
+    name,
+    email,
+    isGuest,
+    language,
+    interests,
+    travelStyle,
+    duration,
+    setLanguage,
+    setPreferences,
+    setOnboarded,
+    logout,
+    themeMode,
+    setThemeMode,
+  } = useUserStore();
   const { t } = useTranslation();
   const { favorites } = usePlacesStore();
   const { downloadedPackages } = useOfflineStore();
-
+  const themeColors = getAppTheme(themeMode);
 
   const handleResetOnboarding = () => {
     Alert.alert(
@@ -60,29 +74,84 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: themeColors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.avatarCircle}>
-          <Text style={styles.avatarText}>{(name || 'T').charAt(0).toUpperCase()}</Text>
+      <View style={[styles.header, { borderBottomColor: themeColors.border }]}>
+        <View style={[styles.avatarCircle, { borderColor: themeColors.primary }]}>
+          <Text style={[styles.avatarText, { color: themeColors.primary }]}>{(name || 'T').charAt(0).toUpperCase()}</Text>
         </View>
-        <Text style={styles.userName}>{name}</Text>
+        <Text style={[styles.userName, { color: themeColors.text }]}>{name}</Text>
         <View style={styles.badgeRow}>
-          <View style={styles.guestBadge}>
-            <MaterialIcons name={isGuest ? 'person-outline' : 'verified-user'} size={14} color={Colors.primary} />
-            <Text style={styles.guestText}>{isGuest ? 'Guest Explorer' : (email || 'Member')}</Text>
+          <View style={[styles.guestBadge, { backgroundColor: themeColors.badge, borderColor: themeColors.border }]}>
+            <MaterialIcons name={isGuest ? 'person-outline' : 'verified-user'} size={14} color={themeColors.primary} />
+            <Text style={[styles.guestText, { color: themeColors.textSecondary }]}>{isGuest ? 'Guest Explorer' : (email || 'Member')}</Text>
           </View>
         </View>
 
         {isGuest && (
-          <TouchableOpacity style={styles.loginBannerBtn} onPress={() => router.push('/auth/login' as any)}>
-            <MaterialIcons name="login" size={16} color={Colors.background} />
+          <TouchableOpacity style={[styles.loginBannerBtn, { backgroundColor: themeColors.primary }]} onPress={() => router.push('/auth/login' as any)}>
+            <MaterialIcons name="login" size={16} color="#FFFFFF" />
             <Text style={styles.loginBannerText}>Sign in to sync saved tours</Text>
           </TouchableOpacity>
         )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Appearance / Theme Toggle */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Appearance & Theme</Text>
+            <View style={[styles.themeActiveBadge, { backgroundColor: themeColors.badge }]}>
+              <Text style={[styles.themeActiveBadgeText, { color: themeColors.primary }]}>
+                {themeMode === 'light' ? '☀️ Dribbble Light' : '🌙 Heritage Dark'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.themeRow}>
+            <TouchableOpacity
+              style={[
+                styles.themeCard,
+                { backgroundColor: themeColors.surfaceElevated, borderColor: themeColors.border },
+                themeMode === 'light' && { borderColor: themeColors.primary, borderWidth: 1.5, backgroundColor: themeColors.isDark ? '#222' : '#FFFFFF' },
+              ]}
+              onPress={() => setThemeMode('light')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.themeIconCircle, { backgroundColor: '#FBF9F6', borderColor: '#E4E2DF' }]}>
+                <MaterialIcons name="light-mode" size={20} color="#9A442D" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.themeCardTitle, { color: themeColors.text }]}>Light Mode</Text>
+                <Text style={[styles.themeCardSub, { color: themeColors.textMuted }]}>Dribbble Ivory</Text>
+              </View>
+              {themeMode === 'light' && (
+                <MaterialIcons name="check-circle" size={18} color={themeColors.primary} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.themeCard,
+                { backgroundColor: themeColors.surfaceElevated, borderColor: themeColors.border },
+                themeMode === 'dark' && { borderColor: themeColors.primary, borderWidth: 1.5, backgroundColor: themeColors.isDark ? '#222' : '#FFFFFF' },
+              ]}
+              onPress={() => setThemeMode('dark')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.themeIconCircle, { backgroundColor: '#171717', borderColor: '#333' }]}>
+                <MaterialIcons name="dark-mode" size={20} color="#D4AF7C" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.themeCardTitle, { color: themeColors.text }]}>Dark Mode</Text>
+                <Text style={[styles.themeCardSub, { color: themeColors.textMuted }]}>Heritage Obsidian</Text>
+              </View>
+              {themeMode === 'dark' && (
+                <MaterialIcons name="check-circle" size={18} color={themeColors.primary} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
         {/* Quick Menu Hub */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Dashboard</Text>
@@ -551,5 +620,49 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     color: Colors.textSecondary,
     lineHeight: 16,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  themeActiveBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  themeActiveBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  themeRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  themeCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+  },
+  themeIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  themeCardTitle: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: '700',
+  },
+  themeCardSub: {
+    fontSize: 10.5,
+    marginTop: 1,
   },
 });

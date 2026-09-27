@@ -19,8 +19,11 @@ interface UserState {
   travelStyle: string;
   duration: string;
   isOnboarded: boolean;
+  themeMode: 'light' | 'dark';
   setUser: (userId: string, token: string, name?: string, email?: string, isGuest?: boolean) => void;
   setLanguage: (lang: string) => void;
+  setThemeMode: (mode: 'light' | 'dark') => void;
+  toggleTheme: () => void;
   setPreferences: (prefs: { interests?: string[]; travelStyle?: string; duration?: string }) => void;
   setOnboarded: (value: boolean) => void;
   logout: () => Promise<void>;
@@ -39,6 +42,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   travelStyle: 'moderate',
   duration: '90min',
   isOnboarded: false,
+  themeMode: 'light',
 
   setUser: (userId, token, name, email, isGuest = false) => {
     set({
@@ -53,6 +57,17 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   setLanguage: (language) => {
     set({ language });
+    get().saveToStorage();
+  },
+
+  setThemeMode: (themeMode) => {
+    set({ themeMode });
+    get().saveToStorage();
+  },
+
+  toggleTheme: () => {
+    const next = get().themeMode === 'dark' ? 'light' : 'dark';
+    set({ themeMode: next });
     get().saveToStorage();
   },
 
@@ -112,6 +127,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         travelStyle: s.travelStyle,
         duration: s.duration,
         isOnboarded: s.isOnboarded,
+        themeMode: s.themeMode,
       };
       await safeStorage.setItem('user_store', JSON.stringify(cleanData));
     } catch (e) {

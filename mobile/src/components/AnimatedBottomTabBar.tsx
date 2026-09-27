@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, BorderRadius } from '../constants/theme';
+import { Colors, BorderRadius, getAppTheme } from '../constants/theme';
+import { useUserStore } from '../stores';
 import type { Tabs } from 'expo-router';
 
 export type CustomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
@@ -41,6 +42,8 @@ interface TabButtonProps {
 function StandardTabButton({ config, label, isFocused, onPress, onLongPress }: TabButtonProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const translateYAnim = useRef(new Animated.Value(isFocused ? -2 : 0)).current;
+  const themeMode = useUserStore((s) => s.themeMode);
+  const themeColors = getAppTheme(themeMode);
 
   // Smooth elevation shift when tab selection changes
   useEffect(() => {
@@ -70,6 +73,10 @@ function StandardTabButton({ config, label, isFocused, onPress, onLongPress }: T
     }).start();
   };
 
+  const activeCapsuleBg = themeColors.isDark
+    ? 'rgba(212, 175, 124, 0.12)'
+    : 'rgba(154, 68, 45, 0.08)';
+
   return (
     <Pressable
       style={styles.tabPressable}
@@ -84,7 +91,7 @@ function StandardTabButton({ config, label, isFocused, onPress, onLongPress }: T
       <Animated.View
         style={[
           styles.tabCapsule,
-          isFocused && styles.tabCapsuleActive,
+          isFocused && { backgroundColor: activeCapsuleBg },
           {
             transform: [
               { scale: scaleAnim },
@@ -97,14 +104,18 @@ function StandardTabButton({ config, label, isFocused, onPress, onLongPress }: T
           <MaterialIcons
             name={config.icon}
             size={22}
-            color={isFocused ? Colors.primary : Colors.textMuted}
+            color={isFocused ? themeColors.primary : themeColors.textMuted}
           />
-          {isFocused && <View style={styles.activeIndicatorPip} />}
+          {isFocused && (
+            <View style={[styles.activeIndicatorPip, { backgroundColor: themeColors.primary }]} />
+          )}
         </View>
         <Text
           style={[
             styles.tabLabel,
-            isFocused ? styles.tabLabelActive : styles.tabLabelInactive,
+            isFocused
+              ? [styles.tabLabelActive, { color: themeColors.primary }]
+              : [styles.tabLabelInactive, { color: themeColors.textMuted }],
           ]}
           numberOfLines={1}
         >
@@ -118,6 +129,8 @@ function StandardTabButton({ config, label, isFocused, onPress, onLongPress }: T
 // ── 2. Center "Yatra AI" Button with Controlled Luxury Aura & Snappy Feedback ──
 function CenterAiButton({ config, isFocused, onPress, onLongPress }: TabButtonProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const themeMode = useUserStore((s) => s.themeMode);
+  const themeColors = getAppTheme(themeMode);
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
@@ -137,6 +150,16 @@ function CenterAiButton({ config, isFocused, onPress, onLongPress }: TabButtonPr
     }).start();
   };
 
+  const centerBg = isFocused
+    ? themeColors.primary
+    : themeColors.isDark
+    ? '#1C1C28'
+    : '#F5ECE6';
+
+  const centerTextColor = isFocused
+    ? '#FFFFFF'
+    : themeColors.primary;
+
   return (
     <Pressable
       style={styles.centerPressable}
@@ -151,6 +174,10 @@ function CenterAiButton({ config, isFocused, onPress, onLongPress }: TabButtonPr
       <Animated.View
         style={[
           styles.aiPillContainer,
+          {
+            backgroundColor: centerBg,
+            borderColor: themeColors.primary,
+          },
           isFocused && styles.aiPillContainerActive,
           {
             transform: [{ scale: scaleAnim }],
@@ -163,7 +190,8 @@ function CenterAiButton({ config, isFocused, onPress, onLongPress }: TabButtonPr
           style={[
             styles.aiGlowHalo,
             {
-              opacity: isFocused ? 0.9 : 0.45,
+              borderColor: themeColors.primary,
+              opacity: isFocused ? 0.9 : 0.35,
             },
           ]}
         />
@@ -171,11 +199,12 @@ function CenterAiButton({ config, isFocused, onPress, onLongPress }: TabButtonPr
         <MaterialIcons
           name={config.icon}
           size={20}
-          color={isFocused ? '#0A0A0E' : Colors.primary}
+          color={centerTextColor}
         />
         <Text
           style={[
             styles.aiPillText,
+            { color: centerTextColor },
             isFocused && styles.aiPillTextActive,
           ]}
           numberOfLines={1}
@@ -191,12 +220,20 @@ function CenterAiButton({ config, isFocused, onPress, onLongPress }: TabButtonPr
 export function AnimatedBottomTabBar({ state, descriptors, navigation }: CustomTabBarProps) {
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 14 : 8);
+  const themeMode = useUserStore((s) => s.themeMode);
+  const themeColors = getAppTheme(themeMode);
 
   return (
     <View
       style={[
         styles.dockedBarContainer,
-        { paddingBottom: bottomPadding },
+        {
+          backgroundColor: themeColors.isDark
+            ? 'rgba(13, 13, 18, 0.98)'
+            : 'rgba(251, 249, 246, 0.97)',
+          borderTopColor: themeColors.border,
+          paddingBottom: bottomPadding,
+        },
       ]}
     >
       <View style={styles.tabBarInner}>

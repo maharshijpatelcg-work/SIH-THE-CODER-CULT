@@ -4,6 +4,124 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
+export interface AppThemeColors {
+  background: string;
+  backgroundAlt: string;
+  surface: string;
+  surfaceElevated: string;
+  surfaceHighlight: string;
+  primary: string;
+  primaryDark: string;
+  primaryLight: string;
+  secondary: string;
+  secondaryLight: string;
+  accent: string;
+  accentLight: string;
+  success: string;
+  warning: string;
+  error: string;
+  info: string;
+  text: string;
+  textSecondary: string;
+  textMuted: string;
+  textInverse: string;
+  border: string;
+  borderLight: string;
+  divider: string;
+  goldSoft: string;
+  goldHairline: string;
+  card: string;
+  badge: string;
+  isDark: boolean;
+  primaryContainer: string;
+  secondaryContainer: string;
+  secondaryFixed: string;
+  surfaceContainerLow: string;
+  surfaceContainerHighest: string;
+  errorContainer: string;
+  onErrorContainer: string;
+}
+
+export const DarkThemeColors: AppThemeColors = {
+  background: '#0F0F0F',
+  backgroundAlt: '#141414',
+  surface: '#171717',
+  surfaceElevated: '#1D1D1D',
+  surfaceHighlight: '#242424',
+  primary: '#D4AF7C',
+  primaryDark: '#A8864F',
+  primaryLight: '#E5C9A4',
+  secondary: '#C17F59',
+  secondaryLight: '#D4976F',
+  accent: '#5B8FB9',
+  accentLight: '#7BADD4',
+  success: '#7FB685',
+  warning: '#D9A45B',
+  error: '#D97B77',
+  info: '#7BAFD4',
+  text: '#F5F1E8',
+  textSecondary: '#A7A7A7',
+  textMuted: '#777777',
+  textInverse: '#0F0F0F',
+  border: 'rgba(255, 255, 255, 0.08)',
+  borderLight: 'rgba(255, 255, 255, 0.12)',
+  divider: 'rgba(255, 255, 255, 0.07)',
+  goldSoft: 'rgba(212, 175, 124, 0.14)',
+  goldHairline: 'rgba(212, 175, 124, 0.22)',
+  card: '#1D1D1D',
+  badge: 'rgba(212, 175, 124, 0.14)',
+  isDark: true,
+  primaryContainer: '#D4AF7C',
+  secondaryContainer: '#2A2218',
+  secondaryFixed: '#3E301F',
+  surfaceContainerLow: '#171717',
+  surfaceContainerHighest: '#242424',
+  errorContainer: 'rgba(217, 123, 119, 0.2)',
+  onErrorContainer: '#FFDAD6',
+};
+
+export const LightThemeColors: AppThemeColors = {
+  background: '#FBF9F6',
+  backgroundAlt: '#F5F3F0',
+  surface: '#FBF9F6',
+  surfaceElevated: '#FFFFFF',
+  surfaceHighlight: '#EFEEEB',
+  primary: '#9A442D',       // Terracotta warm primary from Stitch
+  primaryDark: '#7C2E19',
+  primaryLight: '#E07A5F',
+  secondary: '#7A5814',     // Warm antique bronze from Stitch
+  secondaryLight: '#EDBF71',
+  accent: '#5B8FB9',
+  accentLight: '#7BADD4',
+  success: '#2E7D32',
+  warning: '#D9A45B',
+  error: '#BA1A1A',
+  info: '#5B8FB9',
+  text: '#1B1C1A',          // On-surface obsidian slate from Stitch
+  textSecondary: '#55423E',  // On-surface variant
+  textMuted: '#88726D',      // Muted outline
+  textInverse: '#FFFFFF',
+  border: '#E4E2DF',
+  borderLight: '#EAE8E5',
+  divider: '#E4E2DF',
+  goldSoft: 'rgba(122, 88, 20, 0.10)',
+  goldHairline: 'rgba(122, 88, 20, 0.22)',
+  card: '#FFFFFF',
+  badge: '#F5F3F0',
+  isDark: false,
+  primaryContainer: '#E07A5F',
+  secondaryContainer: '#FFD081',
+  secondaryFixed: '#FFDEAA',
+  surfaceContainerLow: '#F5F3F0',
+  surfaceContainerHighest: '#E4E2DF',
+  errorContainer: '#FFDAD6',
+  onErrorContainer: '#93000A',
+};
+
+export function getAppTheme(mode: 'light' | 'dark' = 'light'): AppThemeColors {
+  return mode === 'dark' ? DarkThemeColors : LightThemeColors;
+}
+
 export const Colors = {
   // Core luxury palette
   background: '#0F0F0F',

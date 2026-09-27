@@ -1,29 +1,33 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
   FlatList,
-  Image,
   TextInput,
   Dimensions,
-  Animated,
+  Platform,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
+import {
+  Colors,
+  Typography,
+  Spacing,
+  BorderRadius,
+  getAppTheme,
+  AppThemeColors,
+} from '../../constants/theme';
 import { useUserStore, usePlacesStore, useChatStore } from '../../stores';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Place } from '../../stores';
 import { placesApi } from '../../services/api';
 import { useLocation } from '../../hooks/useLocation';
-import { PlaceCard } from '../../components/PlaceCard';
 import { CategoryFilter } from '../../components/CategoryFilter';
 import { WeatherCrowdBar } from '../../components/WeatherCrowdBar';
 import { SafetySOSModal } from '../../components/SafetySOSModal';
@@ -39,7 +43,8 @@ import { haversineDistance } from '../../utils/routeService';
 import { ScalePressable, PulseBeacon } from '../../components/common/MicroAnimations';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SPOTLIGHT_CARD_WIDTH = Math.min(SCREEN_WIDTH - 48, 340);
+const SPOTLIGHT_CARD_WIDTH = Math.min(SCREEN_WIDTH - 44, 340);
+const RELIC_CARD_WIDTH = 260;
 
 const ICONIC_SPOTLIGHT_IDS = [
   'IND-HER-26', // Kumbhalgarh Fort
@@ -54,9 +59,6 @@ const ICONIC_SPOTLIGHT_IDS = [
   'IND-HER-02', // Qutub Minar
 ];
 
-// Spotlight card with self-contained async Wikipedia image state.
-// The sync getPlaceImage() provides the instant fallback; fetchPlaceImageAsync()
-// then resolves the real Wikipedia/Wikimedia image and updates the displayed photo.
 interface SpotlightItem {
   id: string;
   title: string;
@@ -73,23 +75,23 @@ interface SpotlightItem {
 interface SpotlightCardProps {
   item: SpotlightItem;
   isPlayingThis: boolean;
+  theme: AppThemeColors;
   onPress: () => void;
   onAudioToggle: () => void;
   onAskAi: () => void;
   onExplore: () => void;
   cardWidth: number;
-  styles: any;
 }
 
 function SpotlightCard({
   item,
   isPlayingThis,
+  theme,
   onPress,
   onAudioToggle,
   onAskAi,
   onExplore,
   cardWidth,
-  styles,
 }: SpotlightCardProps) {
   const resolvedInitial = dynamicImageService.getPlaceImage(
     item.place?.name || item.title,
@@ -107,7 +109,6 @@ function SpotlightCard({
     );
     setImgUrl(resolved);
 
-    // If already verified Wikimedia/Wikipedia, never overwrite
     if (resolved && (resolved.includes('wikimedia.org') || resolved.includes('wikipedia.org'))) {
       return;
     }
@@ -147,7 +148,7 @@ function SpotlightCard({
       {/* Top Badges */}
       <View style={styles.spotlightTopRow} pointerEvents="box-none">
         <View style={styles.spotlightBadge}>
-          <MaterialIcons name="verified" size={12} color={Colors.primary} />
+          <MaterialIcons name="verified" size={14} color="#C59B51" />
           <Text style={styles.spotlightBadgeText}>{item.badge}</Text>
         </View>
         <ScalePressable
@@ -156,45 +157,173 @@ function SpotlightCard({
           minScale={0.9}
         >
           <MaterialIcons
-            name={isPlayingThis ? 'stop' : 'volume-up'}
-            size={16}
-            color={isPlayingThis ? '#FFFFFF' : Colors.primary}
+            name={isPlayingThis ? 'stop' : 'graphic-eq'}
+            size={14}
+            color={isPlayingThis ? '#FFFFFF' : '#FFB4A1'}
           />
           <Text style={[styles.audioPlayBtnText, isPlayingThis && styles.audioPlayBtnTextActive]}>
-            {isPlayingThis ? 'Stop' : 'Audio'}
+            {isPlayingThis ? 'Stop' : 'Listen (2m)'}
           </Text>
         </ScalePressable>
       </View>
 
-      {/* Bottom Content */}
+      {/* Bottom Content Area */}
       <View style={styles.spotlightContent} pointerEvents="box-none">
         <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
-          <Text style={styles.spotlightEra} numberOfLines={1}>{item.era}</Text>
-          <Text style={styles.spotlightTitle} numberOfLines={2} ellipsizeMode="tail">{item.title}</Text>
-          <View style={styles.spotlightLocRow}>
-            <MaterialIcons name="location-on" size={14} color="rgba(255,255,255,0.85)" />
-            <Text style={styles.spotlightLocText} numberOfLines={1} ellipsizeMode="tail">{item.location}</Text>
-          </View>
-          <Text style={styles.spotlightSubtitle} numberOfLines={2}>{item.subtitle}</Text>
+          <Text style={styles.spotlightTitle} numberOfLines={1} ellipsizeMode="tail">
+            {item.title}
+          </Text>
+          <Text style={styles.spotlightMeta} numberOfLines={1}>
+            {item.era} • {item.location} • <Text style={{ color: '#FFD081', fontWeight: '700' }}>★ 4.9 (1.4k)</Text>
+          </Text>
         </TouchableOpacity>
 
         <View style={styles.spotlightActions}>
           <ScalePressable
-            style={styles.spotlightAiBtn}
-            onPress={onAskAi}
-            minScale={0.95}
-          >
-            <MaterialIcons name="auto-awesome" size={14} color="#FFFFFF" />
-            <Text style={styles.spotlightAiBtnText}>Ask AI Guide</Text>
-          </ScalePressable>
-
-          <ScalePressable
-            style={styles.spotlightViewBtn}
+            style={[styles.spotlightExploreBtn, { backgroundColor: theme.isDark ? theme.primary : '#9A442D' }]}
             onPress={onExplore}
             minScale={0.95}
           >
-            <Text style={styles.spotlightViewBtnText}>Explore →</Text>
+            <Text style={styles.spotlightExploreBtnText}>Explore Site</Text>
+            <MaterialIcons name="arrow-forward" size={15} color="#FFFFFF" />
           </ScalePressable>
+
+          <ScalePressable
+            style={styles.spotlightCuratorBtn}
+            onPress={onAskAi}
+            minScale={0.95}
+          >
+            <MaterialIcons name="auto-awesome" size={16} color={theme.isDark ? '#D4AF7C' : '#9A442D'} />
+            <Text style={[styles.spotlightCuratorBtnText, { color: theme.isDark ? '#F5F1E8' : '#1B1C1A' }]}>
+              Curator
+            </Text>
+          </ScalePressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ── Horizontal Relic Card (Dribbble 1:1 Reference) ──
+interface NearbyRelicCardProps {
+  place: Place;
+  theme: AppThemeColors;
+  isFavorite: boolean;
+  onFavoriteToggle: () => void;
+  onPress: () => void;
+  onRoute: () => void;
+}
+
+function NearbyRelicCard({
+  place,
+  theme,
+  isFavorite,
+  onFavoriteToggle,
+  onPress,
+  onRoute,
+}: NearbyRelicCardProps) {
+  const [imgUrl, setImgUrl] = useState<string>(() =>
+    dynamicImageService.getPlaceImage(place.name, place.category, place.imageUrl)
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const resolved = dynamicImageService.getPlaceImage(place.name, place.category, place.imageUrl);
+    setImgUrl(resolved);
+
+    if (resolved && (resolved.includes('wikimedia.org') || resolved.includes('wikipedia.org'))) {
+      return;
+    }
+
+    dynamicImageService.fetchPlaceImageAsync(place.name).then((wikiUrl) => {
+      if (!cancelled && wikiUrl) setImgUrl(wikiUrl);
+    }).catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [place.name, place.imageUrl, place.category]);
+
+  const hr = (place as any).heritageRecord || {};
+  const eraText = hr.period || (place.category === 'temple' ? 'Ancient Era' : 'Historic Site');
+  const catLabel = (hr.significance ? hr.significance.split(' ')[0] : place.category || 'SANCTUARY').toUpperCase();
+  const driveMinutes = Math.max(5, Math.round((place.distance || 2.4) * 3));
+  const feeText = (place as any).entryFee ? `₹${(place as any).entryFee}` : '₹40';
+
+  return (
+    <View
+      style={[
+        styles.relicCard,
+        {
+          backgroundColor: theme.surfaceElevated,
+          borderColor: theme.border,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: theme.isDark ? 0.25 : 0.05,
+          shadowRadius: 8,
+          elevation: 2,
+        },
+      ]}
+    >
+      {/* Photo with Era badge & Bookmark */}
+      <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.relicImgWrap}>
+        <ExpoImage
+          source={{ uri: imgUrl }}
+          style={styles.relicImage}
+          contentFit="cover"
+          transition={250}
+          placeholder={{ blurhash: 'L6PZfSi_.AyE_3t7t7R**0o#DgR4' }}
+          onError={() => setImgUrl(dynamicImageService.getArchitecturalFallback(place.name, place.category, 0))}
+        />
+        <View style={styles.relicEraBadge}>
+          <Text style={styles.relicEraText}>{eraText}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.relicBookmarkBtn}
+          onPress={onFavoriteToggle}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <MaterialIcons
+            name={isFavorite ? 'bookmark' : 'bookmark-border'}
+            size={17}
+            color={theme.isDark ? theme.primary : '#9A442D'}
+          />
+        </TouchableOpacity>
+      </TouchableOpacity>
+
+      {/* Info Body */}
+      <View style={styles.relicBody}>
+        <View>
+          <View style={styles.relicTopRow}>
+            <Text style={[styles.relicCatText, { color: theme.isDark ? theme.primary : '#9A442D' }]}>
+              {catLabel}
+            </Text>
+            <Text style={[styles.relicRatingText, { color: theme.secondary }]}>
+              ★ {place.rating ? place.rating.toFixed(1) : '4.8'}
+            </Text>
+          </View>
+          <Text style={[styles.relicTitle, { color: theme.text }]} numberOfLines={1}>
+            {place.name}
+          </Text>
+          <View style={styles.relicDistRow}>
+            <MaterialIcons name="near-me" size={13} color={theme.isDark ? theme.primary : '#9A442D'} />
+            <Text style={[styles.relicDistText, { color: theme.textMuted }]} numberOfLines={1}>
+              {place.distance !== undefined ? `${place.distance} km away` : 'Nearby'} · {driveMinutes} min drive
+            </Text>
+          </View>
+        </View>
+
+        {/* Pricing & Directions */}
+        <View style={styles.relicFooter}>
+          <Text style={[styles.relicPrice, { color: theme.text }]}>
+            {feeText} <Text style={[styles.relicPriceSub, { color: theme.textMuted }]}>/ pass</Text>
+          </Text>
+          <TouchableOpacity
+            style={[styles.relicDirectionsBtn, { backgroundColor: theme.surfaceHighlight }]}
+            onPress={onRoute}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.relicDirectionsText, { color: theme.text }]}>Directions</Text>
+            <MaterialIcons name="turn-right" size={14} color={theme.text} />
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -204,7 +333,8 @@ function SpotlightCard({
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { name, language } = useUserStore();
+  const { name, language, themeMode } = useUserStore();
+  const theme = getAppTheme(themeMode);
   const { t } = useTranslation();
   const { places, setPlaces, favorites, toggleFavorite, isLoading } = usePlacesStore();
   const { setContext } = useChatStore();
@@ -225,18 +355,13 @@ export default function HomeScreen() {
     }
   }, [isSpeaking]);
 
-  // One-time image cache warming guard
   const hasWarmedCacheRef = useRef(false);
-
-  // Instant render if places already present in store
   const isScreenLoading = (places.length === 0 && (initialLoading || isLoading)) || refreshing;
 
   const latKey = (location.latitude || 22.30).toFixed(2);
   const lonKey = (location.longitude || 73.18).toFixed(2);
 
-  // Merge loaded places with ALL_SEED_PLACES to ensure all 148+ sites are always searchable
-  // and dynamically compute Haversine distance from user GPS coordinates, sorting nearest first.
-  const allCatalogPlaces = React.useMemo(() => {
+  const allCatalogPlaces = useMemo(() => {
     const userLat = location.latitude ?? 22.3072;
     const userLng = location.longitude ?? 73.1812;
 
@@ -252,7 +377,6 @@ export default function HomeScreen() {
       };
     });
 
-    // Sort strictly ascending by distance so closest monuments are always first
     merged.sort((a, b) => (a.distance ?? 99999) - (b.distance ?? 99999));
     return merged;
   }, [places, location.latitude, location.longitude]);
@@ -289,7 +413,6 @@ export default function HomeScreen() {
       if (mounted) {
         setInitialLoading(false);
       }
-      // Background: warm image cache once for top-20 places so subsequent renders are instant
       if (!hasWarmedCacheRef.current) {
         const namesToWarm = [...new Set(
           [...(places.length > 0 ? places : []), ...allCatalogPlaces.slice(0, 20)]
@@ -360,14 +483,12 @@ export default function HomeScreen() {
     });
   };
 
-  // Dynamically derive spotlight monuments from live/seed catalog with authentic data
-  const spotlightMonuments = React.useMemo(() => {
+  const spotlightMonuments = useMemo(() => {
     const matched: Place[] = [];
     for (const tid of ICONIC_SPOTLIGHT_IDS) {
       const p = allCatalogPlaces.find((item) => item.id === tid || item.id?.toLowerCase() === tid.toLowerCase());
       if (p) matched.push(p);
     }
-    // Fallback fill with highest rated places if some IDs not found
     if (matched.length < 5) {
       for (const p of allCatalogPlaces) {
         if (!matched.some((m) => m.id === p.id)) {
@@ -391,7 +512,7 @@ export default function HomeScreen() {
       const audioNarration = hr.shortStory || p.shortDescription || `${title} is a celebrated heritage monument of India.`;
       const aiPrompt = `Tell me the history, architecture, and significance of ${p.name}.`;
       const badge = hr.significance?.includes('UNESCO')
-        ? 'UNESCO Wonder'
+        ? 'UNESCO Nominee'
         : (p.rating && p.rating >= 4.8)
         ? 'Top Rated'
         : 'Heritage Wonder';
@@ -434,64 +555,95 @@ export default function HomeScreen() {
     const hour = new Date().getHours();
     let text = 'Good Evening';
     let icon: keyof typeof MaterialIcons.glyphMap = 'nights-stay';
+    let emoji = '🌙';
 
     if (language === 'hi') {
-      if (hour < 12) { text = 'शुभ प्रभात'; icon = 'wb-twilight'; }
-      else if (hour < 17) { text = 'शुभ दोपहर'; icon = 'wb-sunny'; }
-      else { text = 'शुभ संध्या'; icon = 'nights-stay'; }
+      if (hour < 12) { text = 'शुभ प्रभात'; icon = 'wb-twilight'; emoji = '☀️'; }
+      else if (hour < 17) { text = 'शुभ दोपहर'; icon = 'wb-sunny'; emoji = '☀️'; }
+      else { text = 'शुभ संध्या'; icon = 'nights-stay'; emoji = '🌙'; }
     } else if (language === 'gu') {
-      if (hour < 12) { text = 'શુભ સવાર'; icon = 'wb-twilight'; }
-      else if (hour < 17) { text = 'શુભ બપોર'; icon = 'wb-sunny'; }
-      else { text = 'શુભ સાંજ'; icon = 'nights-stay'; }
+      if (hour < 12) { text = 'શુભ સવાર'; icon = 'wb-twilight'; emoji = '☀️'; }
+      else if (hour < 17) { text = 'શુભ બપોર'; icon = 'wb-sunny'; emoji = '☀️'; }
+      else { text = 'શુભ સાંજ'; icon = 'nights-stay'; emoji = '🌙'; }
     } else {
-      if (hour < 12) { text = 'Good Morning'; icon = 'wb-twilight'; }
-      else if (hour < 17) { text = 'Good Afternoon'; icon = 'wb-sunny'; }
-      else { text = 'Good Evening'; icon = 'nights-stay'; }
+      if (hour < 12) { text = 'Good Morning'; icon = 'wb-twilight'; emoji = '☀️'; }
+      else if (hour < 17) { text = 'Good Afternoon'; icon = 'wb-sunny'; emoji = '☀️'; }
+      else { text = 'Good Evening'; icon = 'nights-stay'; emoji = '🌙'; }
     }
 
-    return { text, icon };
+    return { text, icon, emoji };
   };
 
   const timeMeta = getTimeMeta();
 
   const quickActionsList = [
-    { key: 'explore', label: t('home.exploreMap'), icon: 'map' },
-    { key: 'ai', label: t('home.askAiGuide'), icon: 'auto-awesome' },
-    { key: 'camera', label: t('home.identifyArtifact'), icon: 'camera-alt' },
-    { key: 'plan', label: t('home.planHeritageTour'), icon: 'route' },
+    {
+      key: 'explore',
+      label: 'Explore Map',
+      icon: 'explore',
+      bgLight: '#D2E5F5',
+      iconLight: '#1F313D',
+      bgDark: '#1E2D3B',
+      iconDark: '#7BADD4',
+    },
+    {
+      key: 'ai',
+      label: 'Ask AI',
+      icon: 'auto-awesome',
+      bgLight: '#FFDBD2',
+      iconLight: '#9A442D',
+      bgDark: '#3B221B',
+      iconDark: '#FFB4A1',
+    },
+    {
+      key: 'camera',
+      label: 'Scan Lens',
+      icon: 'document-scanner',
+      bgLight: '#FFDEAA',
+      iconLight: '#7A5814',
+      bgDark: '#362B16',
+      iconDark: '#EDBF71',
+    },
+    {
+      key: 'plan',
+      label: 'Plan Tour',
+      icon: 'calendar-month',
+      bgLight: '#EAE8E5',
+      iconLight: '#55423E',
+      bgDark: '#26262B',
+      iconDark: '#C7C5C2',
+    },
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 95, 115) }]}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Modern Animated Top Navbar Header */}
+        {/* User Status Header (Dribbble 1:1) */}
         <View style={[styles.header, { paddingTop: Math.max(insets.top + 8, 20) }]}>
           <View style={styles.headerLeft}>
-            <View style={styles.headerLogoWrapper}>
-              <Image
-                source={require('../../../assets/images/app-logo.jpeg')}
-                style={styles.headerLogo}
-                resizeMode="cover"
+            <TouchableOpacity
+              style={[styles.headerAvatarWrap, { borderColor: theme.isDark ? theme.primary : '#C59B51' }]}
+              onPress={() => router.push('/(tabs)/profile')}
+              activeOpacity={0.85}
+            >
+              <ExpoImage
+                source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&q=80' }}
+                style={styles.headerAvatar}
+                contentFit="cover"
               />
-              <View style={styles.logoActiveGlow} />
-            </View>
+            </TouchableOpacity>
+
             <View style={styles.headerTextWrap}>
-              <Text style={styles.eyebrowLabel} numberOfLines={1} ellipsizeMode="tail">
-                YATRA · EXPLORE — UNDERSTAND — BELONG
+              <Text style={[styles.eyebrowLabel, { color: theme.textMuted }]} numberOfLines={1}>
+                EXPLORE · UNDERSTAND · BELONG
               </Text>
-              <View style={styles.greetingRow}>
-                <MaterialIcons name={timeMeta.icon} size={13} color={Colors.primary} />
-                <Text style={styles.greeting} numberOfLines={1}>
-                  {timeMeta.text},
-                </Text>
-              </View>
-              <Text style={styles.userName} numberOfLines={1} ellipsizeMode="tail">
-                {name || 'Explorer'}
+              <Text style={[styles.greetingTitle, { color: theme.text }]} numberOfLines={1}>
+                {timeMeta.text}, {name || 'Explorer'} {timeMeta.emoji}
               </Text>
             </View>
           </View>
@@ -501,13 +653,13 @@ export default function HomeScreen() {
               <LocationBadgeSkeleton />
             ) : (
               <ScalePressable
-                style={styles.locationBadge}
+                style={[styles.locationBadge, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}
                 onPress={() => router.push('/(tabs)/explore')}
                 minScale={0.94}
               >
                 <PulseBeacon color="#10B981" size={6} glowSize={12} />
-                <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
-                  {location.city || 'Gujarat'}
+                <Text style={[styles.locationText, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">
+                  {location.city || 'Vadodara'}
                 </Text>
               </ScalePressable>
             )}
@@ -523,14 +675,27 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Live Search Bar with Modern Glass Styling */}
+        {/* Search & Discovery Capsule */}
         <View style={styles.searchSection}>
-          <View style={styles.searchBar}>
-            <MaterialIcons name="search" size={22} color={Colors.primary} />
+          <View
+            style={[
+              styles.searchBar,
+              {
+                backgroundColor: theme.surfaceElevated,
+                borderColor: theme.border,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: theme.isDark ? 0.2 : 0.05,
+                shadowRadius: 8,
+                elevation: 2,
+              },
+            ]}
+          >
+            <MaterialIcons name="search" size={20} color={theme.textMuted} />
             <TextInput
-              style={styles.searchInput}
-              placeholder="Search 155+ heritage sites, temples, palaces..."
-              placeholderTextColor={Colors.textMuted}
+              style={[styles.searchInput, { color: theme.text }]}
+              placeholder="Search 155+ heritage sites, stepwells..."
+              placeholderTextColor={theme.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
               returnKeyType="search"
@@ -541,15 +706,18 @@ export default function HomeScreen() {
                 onPress={() => setSearchQuery('')}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <MaterialIcons name="cancel" size={20} color={Colors.textMuted} />
+                <MaterialIcons name="cancel" size={20} color={theme.textMuted} />
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
                 onPress={() => router.push('/(tabs)/explore')}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={styles.searchExploreBtn}
+                style={[
+                  styles.searchTuneBtn,
+                  { backgroundColor: theme.isDark ? '#26262B' : '#1B1C1A' },
+                ]}
               >
-                <MaterialIcons name="tune" size={17} color={Colors.primary} />
+                <MaterialIcons name="tune" size={16} color="#FFFFFF" />
               </TouchableOpacity>
             )}
           </View>
@@ -558,21 +726,21 @@ export default function HomeScreen() {
         {/* Live Search Results Section */}
         {searchQuery.trim().length > 0 && (
           <View style={styles.searchResultsSection}>
-            <View style={styles.searchActiveBadge}>
-              <MaterialIcons name="filter-list" size={16} color={Colors.primary} />
-              <Text style={styles.searchActiveText}>
+            <View style={[styles.searchActiveBadge, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}>
+              <MaterialIcons name="filter-list" size={16} color={theme.primary} />
+              <Text style={[styles.searchActiveText, { color: theme.text }]}>
                 Found {filteredPlaces.length} site{filteredPlaces.length === 1 ? '' : 's'} matching "{searchQuery}"
               </Text>
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Text style={styles.clearSearchText}>Clear</Text>
+                <Text style={[styles.clearSearchText, { color: theme.primary }]}>Clear</Text>
               </TouchableOpacity>
             </View>
 
             {filteredPlaces.length === 0 ? (
               <View style={styles.searchEmptyContainer}>
-                <MaterialIcons name="search-off" size={44} color={Colors.textMuted} />
-                <Text style={styles.searchEmptyTitle}>No monuments found</Text>
-                <Text style={styles.searchEmptySub}>
+                <MaterialIcons name="search-off" size={44} color={theme.textMuted} />
+                <Text style={[styles.searchEmptyTitle, { color: theme.text }]}>No monuments found</Text>
+                <Text style={[styles.searchEmptySub, { color: theme.textMuted }]}>
                   Try searching for forts, stepwells, temples, or cities like 'Patan', 'Somnath', or 'Kumbhalgarh'.
                 </Text>
               </View>
@@ -587,7 +755,7 @@ export default function HomeScreen() {
                   return (
                     <TouchableOpacity
                       key={place.id}
-                      style={styles.searchResultCard}
+                      style={[styles.searchResultCard, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}
                       onPress={() => router.push(`/place/${place.id}`)}
                       activeOpacity={0.75}
                     >
@@ -600,24 +768,24 @@ export default function HomeScreen() {
                       />
                       <View style={styles.searchResultInfo}>
                         <View style={styles.searchResultHeaderRow}>
-                          <Text style={styles.searchResultName} numberOfLines={1}>
+                          <Text style={[styles.searchResultName, { color: theme.text }]} numberOfLines={1}>
                             {place.name}
                           </Text>
-                          <View style={styles.searchResultCatBadge}>
-                            <Text style={styles.searchResultCatText}>
+                          <View style={[styles.searchResultCatBadge, { backgroundColor: theme.badge }]}>
+                            <Text style={[styles.searchResultCatText, { color: theme.primary }]}>
                               {(place.category || 'site').toUpperCase()}
                             </Text>
                           </View>
                         </View>
-                        <Text style={styles.searchResultDesc} numberOfLines={2}>
+                        <Text style={[styles.searchResultDesc, { color: theme.textMuted }]} numberOfLines={2}>
                           {place.shortDescription || 'Historic Indian architectural wonder.'}
                         </Text>
                         <View style={styles.searchResultFooter}>
-                          <Text style={styles.searchResultMeta}>
+                          <Text style={[styles.searchResultMeta, { color: theme.textMuted }]}>
                             📍 {(place as any).city || (place as any).state || 'India'} {place.distance !== undefined ? `• ${place.distance} km` : ''}
                           </Text>
                           <TouchableOpacity
-                            style={styles.searchResultRouteBtn}
+                            style={[styles.searchResultRouteBtn, { backgroundColor: theme.surfaceHighlight }]}
                             onPress={(e) => {
                               e.stopPropagation();
                               router.push({
@@ -630,8 +798,8 @@ export default function HomeScreen() {
                               });
                             }}
                           >
-                            <MaterialIcons name="directions" size={14} color={Colors.primary} />
-                            <Text style={styles.searchResultRouteBtnText}>Route</Text>
+                            <MaterialIcons name="directions" size={14} color={theme.primary} />
+                            <Text style={[styles.searchResultRouteBtnText, { color: theme.primary }]}>Route</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -643,70 +811,96 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Live Weather & Crowd Density Radar */}
+        {/* Environmental & Crowd Radar Strip */}
         <WeatherCrowdBar
           latitude={location.latitude || 22.3072}
           longitude={location.longitude || 73.1812}
           isLoading={isScreenLoading}
         />
 
-        {/* Tourist Financial Compass & Forex Banner */}
+        {/* Tourist Wallet & Forex Quick-Strip (Dribbble 1:1) */}
         <ScalePressable
-          style={styles.homescreenWalletBanner}
+          style={[
+            styles.forexBanner,
+            {
+              backgroundColor: theme.isDark ? '#231B12' : '#FFF3E0',
+              borderColor: theme.isDark ? 'rgba(212, 175, 124, 0.25)' : '#FFE0B2',
+            },
+          ]}
           onPress={() => router.push('/settings/wallet' as any)}
-          minScale={0.97}
+          minScale={0.98}
         >
-          <View style={styles.homescreenWalletIconWrap}>
-            <MaterialIcons name="currency-exchange" size={18} color={Colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 1 }}>
-              <Text style={styles.homescreenWalletEyebrow}>TOURIST WALLET & FOREX</Text>
-              <View style={styles.homescreenWalletBadge}>
-                <Text style={styles.homescreenWalletBadgeText}>Live Rates</Text>
-              </View>
+          <View style={styles.forexLeft}>
+            <View style={[styles.forexIconWrap, { backgroundColor: theme.isDark ? '#3D2F1B' : '#FFD081' }]}>
+              <MaterialIcons name="currency-exchange" size={19} color={theme.isDark ? '#D4AF7C' : '#795712'} />
             </View>
-            <Text style={styles.homescreenWalletTitle} numberOfLines={1}>
-              UPI One World & Currency Converter
-            </Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.forexTitle, { color: theme.text }]} numberOfLines={1}>
+                Tourist Forex & UPI One World
+              </Text>
+              <Text style={[styles.forexSubtitle, { color: theme.isDark ? theme.primary : '#7A5814' }]}>
+                Zero-markup conversion active
+              </Text>
+            </View>
           </View>
-          <View style={styles.homescreenWalletArrow}>
-            <MaterialIcons name="arrow-forward" size={14} color="#0A0A0E" />
+          <View style={[styles.forexArrowBtn, { backgroundColor: theme.surfaceElevated }]}>
+            <MaterialIcons name="arrow-forward" size={15} color={theme.text} />
           </View>
         </ScalePressable>
 
-        {/* Quick Actions */}
+        {/* Quick Action Grid (4 squircle tiles) */}
         <View style={styles.quickActionsSection}>
-          <Text style={styles.sectionTitle}>{t('home.quickActions')}</Text>
           <View style={styles.quickActionsGrid}>
             {quickActionsList.map((action) => (
               <ScalePressable
                 key={action.key}
-                style={styles.quickActionCard}
+                style={[
+                  styles.quickActionTile,
+                  {
+                    backgroundColor: theme.surfaceElevated,
+                    borderColor: theme.border,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: theme.isDark ? 0.2 : 0.04,
+                    shadowRadius: 8,
+                    elevation: 2,
+                  },
+                ]}
                 onPress={() => handleQuickAction(action.key)}
                 minScale={0.94}
               >
-                <View style={styles.quickActionIcon}>
-                  <MaterialIcons name={action.icon as any} size={22} color={Colors.text} />
+                <View
+                  style={[
+                    styles.quickActionIconBox,
+                    { backgroundColor: theme.isDark ? action.bgDark : action.bgLight },
+                  ]}
+                >
+                  <MaterialIcons
+                    name={action.icon as any}
+                    size={22}
+                    color={theme.isDark ? action.iconDark : action.iconLight}
+                  />
                 </View>
-                <Text style={styles.quickActionLabel} numberOfLines={2}>{action.label}</Text>
+                <Text style={[styles.quickActionLabel, { color: theme.text }]} numberOfLines={1}>
+                  {action.label}
+                </Text>
               </ScalePressable>
             ))}
           </View>
         </View>
 
-        {/* Spotlight Hero Carousel (Visible when not actively searching) */}
+        {/* Featured Spotlight Carousel ("Must-Visit Wonders") */}
         {!searchQuery && (
           <View style={styles.spotlightSection}>
             <View style={styles.sectionHeader}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.sectionEyebrow}>CURATED · ICONIC</Text>
-                <Text style={styles.sectionTitle}>Must-Visit Wonders</Text>
-                <Text style={styles.sectionSubtitle}>Iconic civilisations with AI voice narration</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                  <Text style={{ fontStyle: 'italic', fontFamily: Typography.fontFamily.serif }}>Must-Visit</Text> Wonders
+                </Text>
               </View>
-              <View style={styles.audioHintPill}>
-                <MaterialIcons name="volume-up" size={14} color={Colors.primary} />
-                <Text style={styles.audioHintText}>Audio</Text>
+              <View style={[styles.audioHintPill, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}>
+                <MaterialIcons name="headphones" size={14} color={theme.primary} />
+                <Text style={[styles.audioHintText, { color: theme.text }]}>Audio Guides</Text>
               </View>
             </View>
 
@@ -716,7 +910,7 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               nestedScrollEnabled={true}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingHorizontal: Spacing.xl, gap: 14, paddingTop: 4, paddingBottom: 10 }}
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 14, paddingTop: 4, paddingBottom: 10 }}
               renderItem={({ item }) => {
                 const isPlayingThis = isSpeaking && activeAudioId === item.id;
                 return (
@@ -724,8 +918,8 @@ export default function HomeScreen() {
                     key={item.id}
                     item={item}
                     isPlayingThis={isPlayingThis}
+                    theme={theme}
                     cardWidth={SPOTLIGHT_CARD_WIDTH}
-                    styles={styles}
                     onPress={() => router.push(`/place/${item.id}`)}
                     onAudioToggle={() => handleToggleAudio(item.id, item.audioNarration)}
                     onAskAi={() => handleSpotlightAskAi(item)}
@@ -740,56 +934,71 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Cultural Mystery Trivia Card (Visible when not actively searching) */}
+        {/* Cultural Mystery & Story Card (Dribbble 1:1) */}
         {!searchQuery && (
-          <View style={styles.triviaCardContainer}>
-            <View style={styles.triviaCard}>
-              <View style={styles.triviaHeader}>
-                <View style={styles.triviaIconWrap}>
-                  <MaterialIcons name="psychology" size={24} color={Colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.triviaBadge}>CULTURAL MYSTERY</Text>
-                  <Text style={styles.triviaTitle}>The Inverted Sanctuaries of Gujarat</Text>
-                </View>
+          <View style={styles.mysteryCardContainer}>
+            <View style={[styles.mysteryCard, { backgroundColor: theme.surfaceContainerLow, borderColor: theme.border }]}>
+              <View style={styles.mysteryWatermark} pointerEvents="none">
+                <MaterialIcons
+                  name="temple-hindu"
+                  size={96}
+                  color={theme.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)'}
+                />
               </View>
-              <Text style={styles.triviaBody}>
-                Unlike traditional Indian temples that rise toward the heavens, Gujarat's ancient stepwells (Vavs) descend deep into the earth. They inverted sacred geometry to sanctify groundwater as a subterranean sanctuary for desert travelers!
-              </Text>
-              <TouchableOpacity
-                style={styles.triviaActionBtn}
-                onPress={() => {
-                  setContext(null, 'Stepwell Architecture');
-                  router.push({
-                    pathname: '/(tabs)/ai',
-                    params: {
-                      autoAsk: 'Explain the sacred geometry, folklore, and engineering of stepwells (Vavs) in Gujarat.',
-                    },
-                  });
-                }}
-                activeOpacity={0.8}
-              >
-                <MaterialIcons name="auto-awesome" size={16} color={Colors.primary} />
-                <Text style={styles.triviaActionText}>Ask AI to Unravel This Mystery →</Text>
-              </TouchableOpacity>
+              <View style={styles.mysteryContent}>
+                <View style={styles.mysteryBadgeRow}>
+                  <MaterialIcons name="lightbulb" size={15} color={theme.primary} />
+                  <Text style={[styles.mysteryBadgeText, { color: theme.primary }]}>CULTURAL MYSTERY</Text>
+                </View>
+                <Text style={[styles.mysteryTitle, { color: theme.text }]}>
+                  The Inverted Sanctuaries of Gujarat
+                </Text>
+                <Text style={[styles.mysteryBody, { color: theme.textSecondary }]}>
+                  Centuries ago, stepwells (Vavs) inverted sacred temple geometry downward toward life-giving aquifers, transforming water reservoirs into carved subterranean sanctuaries.
+                </Text>
+                <TouchableOpacity
+                  style={styles.mysteryActionBtn}
+                  onPress={() => {
+                    setContext(null, 'Stepwell Architecture');
+                    router.push({
+                      pathname: '/(tabs)/ai',
+                      params: {
+                        autoAsk: 'Explain the sacred geometry, folklore, and engineering of stepwells (Vavs) in Gujarat.',
+                      },
+                    });
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.mysteryActionText, { color: theme.primary }]}>
+                    Unravel subterranean engineering
+                  </Text>
+                  <MaterialIcons name="east" size={16} color={theme.primary} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
 
-        {/* Nearby Heritage Sites */}
+        {/* Nearby Relics (Nearby Heritage Monuments - Dribbble 1:1) */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
-              <Text style={styles.sectionTitle} numberOfLines={1}>{t('home.nearbyHeritageSites')}</Text>
-              <Text style={styles.sectionSubtitle} numberOfLines={1}>Discover monuments near your GPS coordinates</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]} numberOfLines={1}>
+                Nearby Relics
+              </Text>
+              <Text style={[styles.sectionSubtitle, { color: theme.textMuted }]} numberOfLines={1}>
+                Sorted by proximity
+              </Text>
             </View>
-            <Text style={styles.sectionCount}>{filteredPlaces.length} {t('home.placesCount')}</Text>
+            <Text style={[styles.sectionCount, { color: theme.textMuted }]}>
+              {filteredPlaces.length} places
+            </Text>
           </View>
 
-          {/* Category Filter */}
+          {/* Category Filter Chips */}
           <CategoryFilter selected={selectedCategory} onSelect={setSelectedCategory} />
 
-          {/* Horizontal Place Cards */}
+          {/* Horizontal Heritage Cards */}
           {isScreenLoading ? (
             <ScrollView
               horizontal
@@ -799,27 +1008,45 @@ export default function HomeScreen() {
               <PlaceCardHorizontalSkeleton />
               <PlaceCardHorizontalSkeleton />
               <PlaceCardHorizontalSkeleton />
-              <PlaceCardHorizontalSkeleton />
             </ScrollView>
           ) : filteredPlaces.length > 0 ? (
             <FlatList
-              data={filteredPlaces.slice(0, 8)}
+              data={filteredPlaces.slice(0, 10)}
               horizontal
               showsHorizontalScrollIndicator={false}
               nestedScrollEnabled={true}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingHorizontal: 20 }}
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 14, paddingTop: 4, paddingBottom: 10 }}
               renderItem={({ item }) => (
-                <PlaceCard place={item} onPress={handlePlacePress} variant="horizontal" />
+                <NearbyRelicCard
+                  key={item.id}
+                  place={item}
+                  theme={theme}
+                  isFavorite={favorites.includes(item.id)}
+                  onFavoriteToggle={() => toggleFavorite(item.id)}
+                  onPress={() => handlePlacePress(item)}
+                  onRoute={() => {
+                    router.push({
+                      pathname: '/(tabs)/explore',
+                      params: {
+                        destinationId: item.id,
+                        destinationName: item.name,
+                        routeTo: 'true',
+                      },
+                    });
+                  }}
+                />
               )}
             />
           ) : (
             <View style={styles.emptyWrap}>
-              <MaterialIcons name="search-off" size={48} color={Colors.textMuted} />
-              <Text style={styles.emptyText}>{t('home.noPlacesFound')}</Text>
+              <MaterialIcons name="search-off" size={48} color={theme.textMuted} />
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                {t('home.noPlacesFound')}
+              </Text>
               {(selectedCategory || searchQuery.length > 0) && (
                 <TouchableOpacity
-                  style={styles.emptyClearBtn}
+                  style={[styles.emptyClearBtn, { backgroundColor: theme.primary }]}
                   onPress={() => {
                     setSelectedCategory(null);
                     setSearchQuery('');
@@ -834,17 +1061,17 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Living Crafts & Artisans of Gujarat Banner */}
+        {/* Living Crafts & Artisans Banner */}
         {!searchQuery && (
           <View style={styles.craftsBannerContainer}>
-            <View style={styles.craftsBanner}>
+            <View style={[styles.craftsBanner, { backgroundColor: theme.surfaceContainerLow, borderColor: theme.border }]}>
               <View style={styles.craftsContent}>
-                <View style={styles.craftsBadge}>
-                  <MaterialIcons name="palette" size={14} color="#FFFFFF" />
-                  <Text style={styles.craftsBadgeText}>LIVING CRAFTS</Text>
+                <View style={[styles.craftsBadge, { backgroundColor: theme.isDark ? 'rgba(212, 175, 124, 0.2)' : 'rgba(154, 68, 45, 0.12)' }]}>
+                  <MaterialIcons name="palette" size={14} color={theme.primary} />
+                  <Text style={[styles.craftsBadgeText, { color: theme.primary }]}>LIVING CRAFTS</Text>
                 </View>
-                <Text style={styles.craftsTitle}>Patan Patola & Rogan Art</Text>
-                <Text style={styles.craftsDesc}>
+                <Text style={[styles.craftsTitle, { color: theme.text }]}>Patan Patola & Rogan Art</Text>
+                <Text style={[styles.craftsDesc, { color: theme.textSecondary }]}>
                   Centuries-old double ikat weaving and castor seed art preserved by master craftsmen of Gujarat.
                 </Text>
                 <TouchableOpacity
@@ -860,59 +1087,12 @@ export default function HomeScreen() {
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.craftsBtnText}>Discover Master Crafts →</Text>
+                  <Text style={[styles.craftsBtnText, { color: theme.primary }]}>Discover Master Crafts →</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
         )}
-
-        {/* Curated Heritage Showcase */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionHeaderLeft}>
-              <Text style={styles.sectionTitle} numberOfLines={1}>{t('home.allNearbyPlaces')}</Text>
-              <Text style={styles.sectionSubtitle} numberOfLines={1}>Curated monuments, palaces & sacred sites</Text>
-            </View>
-            <TouchableOpacity style={styles.seeAllBtn} onPress={() => router.push('/(tabs)/explore')}>
-              <Text style={styles.seeAllText}>View Map →</Text>
-            </TouchableOpacity>
-          </View>
-          {isScreenLoading ? (
-            <View style={{ paddingHorizontal: 20 }}>
-              <PlaceCardVerticalSkeleton />
-              <PlaceCardVerticalSkeleton />
-              <PlaceCardVerticalSkeleton />
-              <PlaceCardVerticalSkeleton />
-            </View>
-          ) : (
-            <View style={styles.curatedList}>
-              {filteredPlaces.slice(0, 6).map((place) => (
-                <PlaceCard
-                  key={place.id}
-                  place={place}
-                  onPress={handlePlacePress}
-                  variant="vertical"
-                  isFavorite={favorites.includes(place.id)}
-                  onFavoriteToggle={toggleFavorite}
-                />
-              ))}
-            </View>
-          )}
-
-          {filteredPlaces.length > 6 && (
-            <TouchableOpacity
-              style={styles.exploreMoreBtn}
-              onPress={() => router.push('/(tabs)/explore')}
-              activeOpacity={0.8}
-            >
-              <MaterialIcons name="explore" size={20} color={Colors.primary} />
-              <Text style={styles.exploreMoreText} numberOfLines={2}>
-                Explore All {filteredPlaces.length} Heritage Sites on Live Radar Map →
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
       </ScrollView>
 
       {/* Geo-Fenced Safety & SOS Emergency Modal */}
@@ -930,7 +1110,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollContent: {
     paddingBottom: 115,
@@ -940,7 +1119,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 50,
     paddingBottom: Spacing.md,
     gap: 12,
   },
@@ -950,28 +1128,20 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 11,
   },
-  headerLogoWrapper: {
-    position: 'relative',
-  },
-  headerLogo: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  headerAvatarWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     borderWidth: 1.5,
-    borderColor: 'rgba(212, 175, 124, 0.45)',
+    overflow: 'hidden',
+    padding: 1.5,
   },
-  logoActiveGlow: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2,
-    borderColor: Colors.background,
+  headerAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
   },
   headerTextWrap: {
     flex: 1,
@@ -979,168 +1149,137 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   eyebrowLabel: {
-    fontSize: 9.5,
-    fontWeight: '800',
+    fontSize: 9,
+    fontWeight: '700',
     letterSpacing: 1.4,
-    color: Colors.primary,
+    textTransform: 'uppercase',
     marginBottom: 2,
   },
-  greetingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  greeting: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  userName: {
-    fontFamily: Typography.fontFamily.serif,
-    fontSize: 22,
+  greetingTitle: {
+    fontSize: 16,
     fontWeight: '700',
-    color: Colors.text,
-    letterSpacing: 0.2,
-    marginTop: 1,
+    letterSpacing: 0.1,
   },
   headerRight: {
     flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
   },
   locationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.035)',
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
-    borderColor: 'rgba(212, 175, 124, 0.25)',
-    maxWidth: 120,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  gpsRadarContainer: {
-    width: 14,
-    height: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  gpsRadarPulse: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: 'rgba(76, 175, 80, 0.4)',
-  },
-  gpsRadarDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#4CAF50',
   },
   locationText: {
-    fontSize: 11,
-    color: Colors.text,
-    fontWeight: '700',
-    flexShrink: 1,
-    minWidth: 0,
+    fontSize: 12,
+    fontWeight: '600',
   },
   sosBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#EF5350',
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    gap: 3,
+    backgroundColor: '#BA1A1A',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: BorderRadius.full,
-    flexShrink: 0,
-    shadowColor: '#EF5350',
+    shadowColor: '#BA1A1A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sosBadgeText: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: '800',
     color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
+
+  // Search Section
   searchSection: {
     paddingHorizontal: 20,
-    marginBottom: Spacing.sm,
+    marginBottom: 14,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    height: 50,
+    borderRadius: 25,
     paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(212, 175, 124, 0.22)',
+    gap: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: Typography.sizes.sm,
-    color: Colors.text,
-    padding: 0,
+    fontSize: 13.5,
+    height: '100%',
   },
-  searchExploreBtn: {
-    padding: 4,
+  searchTuneBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+
+  // Search results
   searchResultsSection: {
-    paddingHorizontal: Spacing.xl,
-    marginBottom: Spacing.md,
+    paddingHorizontal: 20,
+    marginBottom: 16,
   },
   searchActiveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(212, 175, 124, 0.12)',
-    marginBottom: Spacing.md,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: BorderRadius.lg,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(212, 175, 124, 0.25)',
+    marginBottom: 10,
+    gap: 8,
   },
   searchActiveText: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: '600',
-    color: Colors.primary,
     flex: 1,
-    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '600',
   },
   clearSearchText: {
-    fontSize: Typography.sizes.xs,
+    fontSize: 12,
     fontWeight: '700',
-    color: Colors.primary,
+  },
+  searchEmptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 28,
+  },
+  searchEmptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 8,
+  },
+  searchEmptySub: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    paddingHorizontal: 20,
   },
   searchResultsList: {
-    gap: 12,
+    gap: 10,
   },
   searchResultCard: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xl,
+    borderRadius: 14,
     padding: 10,
-    gap: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
-    ...Shadows.sm,
+    gap: 12,
   },
   searchResultThumb: {
-    width: 78,
-    height: 78,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.surfaceHighlight,
+    width: 72,
+    height: 72,
+    borderRadius: 10,
   },
   searchResultInfo: {
     flex: 1,
@@ -1148,18 +1287,16 @@ const styles = StyleSheet.create({
   },
   searchResultHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 6,
   },
   searchResultName: {
-    fontSize: Typography.sizes.base,
+    fontSize: 14,
     fontWeight: '700',
-    color: Colors.text,
     flex: 1,
   },
   searchResultCatBadge: {
-    backgroundColor: 'rgba(212, 175, 124, 0.12)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -1167,520 +1304,474 @@ const styles = StyleSheet.create({
   searchResultCatText: {
     fontSize: 9,
     fontWeight: '800',
-    color: Colors.primary,
   },
   searchResultDesc: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textSecondary,
-    lineHeight: 16,
-    marginVertical: 3,
+    fontSize: 11,
+    lineHeight: 15,
   },
   searchResultFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   searchResultMeta: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textMuted,
+    fontSize: 11,
   },
   searchResultRouteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(212, 175, 124, 0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(212, 175, 124, 0.35)',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   searchResultRouteBtnText: {
-    fontSize: Typography.sizes.xs,
+    fontSize: 11,
     fontWeight: '700',
-    color: Colors.primary,
   },
-  searchEmptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 36,
-    gap: 8,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 20,
-  },
-  searchEmptyTitle: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  searchEmptySub: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  homescreenWalletBanner: {
-    marginHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 6,
+
+  // Tourist Forex Banner
+  forexBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#161622',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginBottom: 14,
+    padding: 12,
     borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: 'rgba(212, 175, 124, 0.22)',
-    gap: 12,
   },
-  homescreenWalletIconWrap: {
-    width: 36,
-    height: 36,
+  forexLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
+  },
+  forexIconWrap: {
+    width: 34,
+    height: 34,
     borderRadius: 10,
-    backgroundColor: 'rgba(212, 175, 124, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(212, 175, 124, 0.25)',
   },
-  homescreenWalletEyebrow: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: Colors.primary,
-    letterSpacing: 0.8,
-  },
-  homescreenWalletBadge: {
-    backgroundColor: 'rgba(127, 182, 133, 0.15)',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  homescreenWalletBadgeText: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: Colors.success,
-  },
-  homescreenWalletTitle: {
+  forexTitle: {
     fontSize: 13,
-    fontWeight: '800',
-    color: Colors.text,
+    fontWeight: '700',
   },
-  homescreenWalletArrow: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.primary,
+  forexSubtitle: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  forexArrowBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 8,
   },
+
+  // Quick Action Grid (4 squircle tiles)
   quickActionsSection: {
     paddingHorizontal: 20,
-    marginBottom: 28,
-    marginTop: Spacing.sm,
+    marginBottom: 20,
   },
   quickActionsGrid: {
     flexDirection: 'row',
-    marginTop: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
+    gap: 10,
   },
-  quickActionCard: {
+  quickActionTile: {
     flex: 1,
-    minWidth: 0,
-    flexShrink: 1,
     alignItems: 'center',
-    gap: 7,
-    paddingVertical: 16,
+    justifyContent: 'center',
+    paddingVertical: 12,
     paddingHorizontal: 4,
-    borderRightWidth: 1,
-    borderRightColor: Colors.divider,
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  quickActionIcon: {
+  quickActionIconBox: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+    borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    marginBottom: 6,
   },
   quickActionLabel: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  // Spotlight Hero Section
+  spotlightSection: {
+    marginBottom: 22,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  sectionHeaderLeft: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  sectionCount: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  audioHintPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  audioHintText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 14,
-    minWidth: 0,
-  },
-  spotlightSection: {
-    marginBottom: 32,
   },
   spotlightCard: {
-    width: SPOTLIGHT_CARD_WIDTH,
-    height: 340,
-    borderRadius: BorderRadius.lg,
+    height: 250,
+    borderRadius: 24,
     overflow: 'hidden',
-    backgroundColor: '#141414',
-    position: 'relative',
+    justifyContent: 'space-between',
+    padding: 14,
+    backgroundColor: '#1E1E1E',
   },
   spotlightImage: {
     ...StyleSheet.absoluteFill,
   },
   spotlightScrim: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(8, 8, 10, 0.38)',
+    backgroundColor: 'rgba(15, 15, 15, 0.45)',
   },
   spotlightTopRow: {
-    position: 'absolute',
-    top: 14,
-    left: 14,
-    right: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    zIndex: 2,
-    gap: 8,
+    zIndex: 10,
   },
   spotlightBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(10, 10, 12, 0.62)',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: BorderRadius.full,
-    flexShrink: 1,
-    maxWidth: '60%',
   },
   spotlightBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#F5F1E8',
-    letterSpacing: 0.8,
-    flexShrink: 1,
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#1B1C1A',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   audioPlayBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(10, 10, 12, 0.62)',
+    backgroundColor: 'rgba(27, 28, 26, 0.75)',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4.5,
     borderRadius: BorderRadius.full,
-    flexShrink: 0,
   },
   audioPlayBtnActive: {
-    backgroundColor: '#E53935',
-    borderColor: '#EF5350',
+    backgroundColor: '#BA1A1A',
   },
   audioPlayBtnText: {
+    color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '700',
-    color: Colors.primary,
+    fontWeight: '600',
   },
   audioPlayBtnTextActive: {
     color: '#FFFFFF',
+    fontWeight: '800',
   },
   spotlightContent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 14,
-    zIndex: 2,
-  },
-  spotlightEra: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
+    zIndex: 10,
+    gap: 10,
   },
   spotlightTitle: {
     fontFamily: Typography.fontFamily.serif,
-    fontSize: 27,
-    lineHeight: 32,
+    fontSize: 22,
     fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 0.2,
   },
-  spotlightLocRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  spotlightMeta: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.9)',
     marginTop: 2,
-    minWidth: 0,
-  },
-  spotlightLocText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontWeight: '500',
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  spotlightSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.75)',
-    marginTop: 3,
   },
   spotlightActions: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 10,
   },
-  spotlightAiBtn: {
+  spotlightExploreBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: Colors.text,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.md,
+    height: 38,
+    borderRadius: 12,
   },
-  spotlightAiBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0F0F0F',
-  },
-  spotlightViewBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  spotlightViewBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
+  spotlightExploreBtnText: {
     color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '700',
   },
-  audioHintPill: {
+  spotlightCuratorBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(212, 175, 124, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
+    height: 38,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
   },
-  audioHintText: {
-    fontSize: 11,
+  spotlightCuratorBtnText: {
+    fontSize: 12.5,
     fontWeight: '700',
-    color: Colors.primary,
   },
-  triviaCardContainer: {
+
+  // Cultural Mystery Card
+  mysteryCardContainer: {
     paddingHorizontal: 20,
-    marginBottom: 32,
+    marginBottom: 22,
   },
-  triviaCard: {
-    backgroundColor: 'transparent',
-    borderRadius: 0,
-    padding: 0,
-    borderWidth: 0,
-    borderLeftWidth: 2,
-    borderLeftColor: Colors.primary,
-    paddingLeft: 16,
+  mysteryCard: {
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  triviaHeader: {
+  mysteryWatermark: {
+    position: 'absolute',
+    right: -10,
+    bottom: -15,
+  },
+  mysteryContent: {
+    zIndex: 1,
+    gap: 6,
+  },
+  mysteryBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 10,
+    gap: 5,
   },
-  triviaIconWrap: {
-    display: 'none',
-  },
-  triviaBadge: {
+  mysteryBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: Colors.primary,
-    letterSpacing: 1.6,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
-  triviaTitle: {
+  mysteryTitle: {
     fontFamily: Typography.fontFamily.serif,
-    fontSize: 19,
+    fontStyle: 'italic',
+    fontSize: 18,
     fontWeight: '700',
-    color: Colors.text,
+  },
+  mysteryBody: {
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  mysteryActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginTop: 4,
   },
-  triviaBody: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    lineHeight: 22,
-    marginBottom: 12,
-    marginTop: 8,
+  mysteryActionText: {
+    fontSize: 12.5,
+    fontWeight: '700',
   },
-  triviaActionBtn: {
+
+  // Nearby Relics Section
+  section: {
+    marginBottom: 20,
+  },
+  relicCard: {
+    width: RELIC_CARD_WIDTH,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  relicImgWrap: {
+    width: '100%',
+    height: 140,
+    position: 'relative',
+  },
+  relicImage: {
+    width: '100%',
+    height: '100%',
+  },
+  relicEraBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(27, 28, 26, 0.78)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  relicEraText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  relicBookmarkBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  relicBody: {
+    padding: 12,
+    justifyContent: 'space-between',
+    minHeight: 120,
+  },
+  relicTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    paddingVertical: 6,
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
-  triviaActionText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: '600',
-    color: Colors.primary,
+  relicCatText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
+  relicRatingText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  relicTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  relicDistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  relicDistText: {
+    fontSize: 11,
+  },
+  relicFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    marginTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(150, 150, 150, 0.1)',
+  },
+  relicPrice: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  relicPriceSub: {
+    fontSize: 10.5,
+    fontWeight: '400',
+  },
+  relicDirectionsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  relicDirectionsText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+
+  // Crafts Banner
   craftsBannerContainer: {
     paddingHorizontal: 20,
-    marginBottom: 32,
+    marginBottom: 20,
   },
   craftsBanner: {
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.lg,
   },
   craftsContent: {
     gap: 6,
   },
   craftsBadge: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: BorderRadius.full,
-    marginBottom: 4,
+    borderRadius: 6,
   },
   craftsBadgeText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '800',
-    color: '#FFFFFF',
     letterSpacing: 0.8,
   },
   craftsTitle: {
-    fontFamily: Typography.fontFamily.serif,
-    fontSize: Typography.sizes.lg,
-    fontWeight: '800',
-    color: Colors.text,
+    fontSize: 16,
+    fontWeight: '700',
   },
   craftsDesc: {
-    fontSize: Typography.sizes.xs,
-    color: 'rgba(255, 248, 231, 0.8)',
-    lineHeight: 18,
-    marginBottom: 6,
+    fontSize: 12,
+    lineHeight: 17,
   },
   craftsBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.lg,
+    marginTop: 2,
   },
   craftsBtnText: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: '800',
-    color: Colors.textInverse,
-  },
-  section: {
-    marginBottom: 32,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingHorizontal: 20,
-    marginBottom: 14,
-    gap: 12,
-  },
-  sectionHeaderLeft: {
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  curatedList: {
-    paddingHorizontal: 20,
-  },
-  sectionTitle: {
-    fontFamily: Typography.fontFamily.serif,
-    fontSize: 21,
+    fontSize: 12.5,
     fontWeight: '700',
-    color: Colors.text,
-    letterSpacing: 0.2,
   },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 3,
-  },
-  sectionCount: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textMuted,
-    flexShrink: 0,
-  },
+
+  // Empty state
   emptyWrap: {
-    padding: Spacing['3xl'],
     alignItems: 'center',
-    gap: 8,
+    paddingVertical: 36,
   },
   emptyText: {
-    fontSize: Typography.sizes.base,
-    color: Colors.textMuted,
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 8,
   },
   emptyClearBtn: {
-    marginTop: 8,
-    paddingHorizontal: 14,
+    marginTop: 12,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(212, 175, 124, 0.12)',
   },
   emptyClearText: {
-    fontSize: Typography.sizes.xs,
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '700',
-    color: Colors.primary,
-  },
-  sectionEyebrow: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.6,
-    color: Colors.primary,
-    marginBottom: 3,
-  },
-  seeAllBtn: {
-    flexShrink: 0,
-    paddingVertical: 4,
-    paddingLeft: 8,
-  },
-  seeAllText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  exploreMoreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Colors.surface,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.base,
-    borderRadius: BorderRadius.xl,
-    marginTop: Spacing.sm,
-    marginHorizontal: Spacing.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(212, 175, 124, 0.25)',
-    ...Shadows.sm,
-  },
-  exploreMoreText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: '700',
-    color: Colors.primary,
-    textAlign: 'center',
-    flexShrink: 1,
   },
 });
